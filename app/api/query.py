@@ -8,7 +8,10 @@ from app.schemas.models import (
 )
 from app.core.vector_store import search_vector_store
 from app.core.context_builder import build_context_from_chunks
-from app.core.generator import generate_answer
+from app.core.generator import (
+    generate_answer,
+    is_extractive_fallback_answer
+)
 from app.core.hybrid_retriever import hybrid_search
 from app.core.reranker import rerank_chunks
 from app.core.citation_validator import validate_answer_citations
@@ -128,7 +131,11 @@ def ask_question(request: QueryRequest):
         citations=citation_dicts
     )
 
-    if not is_valid:
+    # Important:
+    # If Gemini/API failed, generator.py returns an extractive fallback answer.
+    # That answer is already built directly from retrieved context, so do not
+    # overwrite it with the generic citation-validation error.
+    if not is_valid and not is_extractive_fallback_answer(answer):
         answer = (
             "I could not generate a citation-supported answer from the retrieved evidence. "
             "Please check the retrieved_chunks field for the most relevant source passages."
