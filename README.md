@@ -405,5 +405,25 @@ DocuGuard RAG includes a React + Vite frontend dashboard for interacting with th
 
 Start backend first:
 
-```bash
 uvicorn app.main:app --reload
+
+## Screenshots
+
+### Frontend Dashboard
+
+![Frontend Dashboard](assets/dashboard.png)
+
+### Query Result with Citations and Retrieved Evidence
+
+![Query Result](assets/query_result.png)
+
+### GitHub Actions Retrieval Quality Gate
+
+![CI Green](assets/ci_green.png)
+
+### FastAPI Swagger Docs
+
+![Swagger Docs](assets/swagger.png)
+
+
+```bash
