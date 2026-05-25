@@ -9,7 +9,8 @@ from app.core.latex_parser import parse_latex
 from app.core.chunking import chunk_pages
 from app.core.vector_store import (
     add_chunks_to_vector_store,
-    delete_document_from_vector_store
+    delete_document_from_vector_store,
+    get_indexed_sources_from_vector_store
 )
 from app.core.bm25_store import build_bm25_index
 from app.core.acronym_extractor import (
@@ -75,25 +76,25 @@ async def upload_document(file: UploadFile = File(...)):
 
 @router.get("/")
 def list_documents():
-    os.makedirs(settings.raw_data_dir, exist_ok=True)
+    indexed_sources = get_indexed_sources_from_vector_store()
 
     files = []
 
-    for filename in os.listdir(settings.raw_data_dir):
-        if filename.lower().endswith(ALLOWED_EXTENSIONS):
-            file_path = os.path.join(settings.raw_data_dir, filename)
-            files.append(
-                {
-                    "filename": filename,
-                    "path": file_path
-                }
-            )
+    for source in indexed_sources:
+        raw_path = os.path.join(settings.raw_data_dir, source)
+
+        files.append(
+            {
+                "filename": source,
+                "path": raw_path if os.path.exists(raw_path) else "",
+                "indexed": True
+            }
+        )
 
     return {
         "documents": files,
         "count": len(files)
     }
-
 
 @router.delete("/{filename}")
 def delete_document(filename: str):

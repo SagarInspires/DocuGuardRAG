@@ -128,3 +128,20 @@ def get_all_chunks_from_vector_store(source: str | None = None) -> list[dict]:
         )
 
     return chunks
+
+
+def get_indexed_sources_from_vector_store() -> list[str]:
+    collection = get_chroma_collection()
+
+    results = collection.get()
+
+    metadatas = results.get("metadatas", [])
+
+    sources = set()
+
+    for metadata in metadatas:
+        source = metadata.get("source")
+        if source:
+            sources.add(source)
+
+    return sorted(list(sources))
