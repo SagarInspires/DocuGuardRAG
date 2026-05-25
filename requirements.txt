@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-multipart
+pydantic
+pydantic-settings
+python-dotenv
+PyMuPDF
+tiktoken
+chromadb
+sentence-transformers
+rank-bm25
+numpy
+pandas
+scikit-learn
+pyyaml
+pytesseract
+Pillow

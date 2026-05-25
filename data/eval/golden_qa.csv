@@ -1,0 +1,8 @@
+id,question,source,expected_page,expected_section,answerable
+1,What is the main contribution of the CFAT paper?,Ray_CFAT_Unleashing_Triangular_Windows_for_Image_Super-resolution_CVPR_2024_paper (1).pdf,2,,yes
+2,What is OCFAB in CFAT?,Ray_CFAT_Unleashing_Triangular_Windows_for_Image_Super-resolution_CVPR_2024_paper (1).pdf,2,,yes
+3,What datasets are used for evaluating CFAT?,Ray_CFAT_Unleashing_Triangular_Windows_for_Image_Super-resolution_CVPR_2024_paper (1).pdf,6|7|8,,yes
+4,What optimizer is used for CFAT training?,Ray_CFAT_Unleashing_Triangular_Windows_for_Image_Super-resolution_CVPR_2024_paper (1).pdf,6,,yes
+5,What is hybrid retrieval?,test_notes.md,-1,Hybrid Retrieval,yes
+6,What metrics should production RAG evaluation use?,test_notes.md,-1,Evaluation,yes
+7,What is the capital of France according to this document?,Ray_CFAT_Unleashing_Triangular_Windows_for_Image_Super-resolution_CVPR_2024_paper (1).pdf,,,no
