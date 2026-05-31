@@ -30,3 +30,4 @@ class QueryResponse(BaseModel):
     answer: str
     citations: List[Citation]
     retrieved_chunks: List[RetrievedChunk]
+    answer_mode: str = "unknown"
