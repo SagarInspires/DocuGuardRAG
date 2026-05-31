@@ -1,83 +1,418 @@
-
-````md
 # DocuGuard RAG
 
-DocuGuard RAG is a production-style Retrieval-Augmented Generation backend for asking questions over technical documents, research papers, notes, and LaTeX/Markdown files.
+DocuGuard RAG is a production-style Retrieval-Augmented Generation system for asking questions over PDFs, research papers, technical notes, Markdown files, and LaTeX documents.
 
-The project is built from scratch using FastAPI, ChromaDB, SentenceTransformers, BM25, cross-encoder reranking, citation validation, dynamic acronym expansion, and CI-backed retrieval evaluation.
+It supports hybrid retrieval, reranking, citation inspection, local LLM answer generation using Ollama, parser selection controls, layout-aware PDF parsing, and observability metrics for debugging retrieval and latency issues.
 
----
-
-## Key Features
-
-- Multi-format ingestion:
-  - PDF
-  - Markdown
-  - LaTeX `.tex`
-- PDF parsing with page-level metadata
-- OCR fallback foundation for scanned / OneNote-exported PDFs
-- Token-based chunking with overlap
-- ChromaDB vector store
-- BM25 keyword retrieval
-- Hybrid retrieval using vector search + BM25
-- Cross-encoder reranking
-- Document-specific acronym extraction and query expansion
-- Source-filtered querying
-- Citation and retrieved chunk return
-- Safe no-result guard
-- LLM fallback handling for quota/provider errors
-- Document listing and deletion
-- Retrieval evaluation with golden QA dataset
-- CI quality gate using GitHub Actions
+This is not a basic PDF chatbot. It is built as an engineering-focused RAG system where every answer can be inspected through retrieved chunks, citations, answer mode, and query-level traces.
 
 ---
 
-## Architecture
+## What DocuGuard RAG Solves
+
+Most RAG demos only show:
+
+```text
+PDF → chunks → embeddings → answer
+```
+
+DocuGuard RAG adds the missing production components:
 
 ```text
 Document Upload
       ↓
-Parser
-(PDF / Markdown / LaTeX / OCR fallback)
+Parser Selection
       ↓
-Acronym Extraction
+Layout-Aware Extraction
       ↓
-Token Chunking
+Chunking
       ↓
-Embeddings + ChromaDB
+Vector + BM25 Retrieval
       ↓
-BM25 Keyword Index
-      ↓
-Hybrid Retrieval
-(Vector + BM25)
+Hybrid Search
       ↓
 Cross-Encoder Reranking
       ↓
 Context Builder
       ↓
-LLM Answer Generation
-      ↓
-Citation Validation
+Ollama Local LLM
       ↓
 Answer + Citations + Retrieved Evidence
-````
+      ↓
+Observability Logs + Metrics Dashboard
+```
+
+The goal is to make document QA explainable, inspectable, and debuggable.
+
+---
+
+## Key Features
+
+### Multi-Format Document Ingestion
+
+* PDF upload
+* Markdown upload
+* LaTeX `.tex` upload
+* Page-level PDF metadata
+* Source-level document filtering
+* Document listing and deletion
+
+### Parser Selection Controls
+
+During upload, the user can manually select:
+
+#### Document Type
+
+* Auto Detect
+* PDF with text layer
+* Scanned PDF / OCR-heavy
+* Slides / PPT-style PDF
+* Report / multi-section document
+* Markdown
+* LaTeX
+
+#### Extraction Mode
+
+* Auto
+* Text layer only
+* OCR only
+* Text + OCR hybrid
+
+#### Layout Mode
+
+* Auto layout detection
+* Default reading order
+* Multi-column / left-right continuation
+* Slide layout
+* Report layout
+* Preserve regions and coordinates
+
+This is important because a `.pdf` file can be a normal text PDF, scanned notes, a slide deck, a report, a OneNote export, or a mixed-layout document.
+
+---
+
+## Retrieval Pipeline
+
+DocuGuard RAG uses a hybrid retrieval system:
+
+1. User question is expanded using document-specific acronyms.
+2. ChromaDB vector search retrieves semantic candidates.
+3. BM25 retrieves exact keyword and acronym matches.
+4. Hybrid retrieval combines semantic and lexical search.
+5. Cross-encoder reranker reorders candidates.
+6. Top chunks are passed to the LLM.
+7. Citations and retrieved chunks are returned with the answer.
+
+---
+
+## Answer Generation
+
+DocuGuard RAG uses **Ollama** for local LLM generation.
+
+No paid Gemini/OpenAI API key is required for the main answer generation path.
+
+Current generation flow:
+
+```text
+Retrieved chunks
+      ↓
+Relevant context compression
+      ↓
+Ollama local model
+      ↓
+Clean document-grounded answer
+      ↓
+Citations shown separately
+```
+
+Supported answer modes:
+
+```text
+llm
+extractive_fallback
+no_results
+error
+```
+
+If Ollama is unavailable, the system falls back to a conservative extractive answer. This fallback is not the main product output; it is only a safety mechanism.
+
+---
+
+## Observability
+
+DocuGuard RAG logs every query into a JSONL trace file.
+
+Query traces are stored at:
+
+```text
+data/processed/observability/query_logs.jsonl
+```
+
+Each query trace includes:
+
+* query ID
+* timestamp
+* question
+* selected source
+* retrieval mode
+* top K
+* expanded query
+* retrieved chunk IDs
+* reranked chunk IDs
+* citation count
+* answer mode
+* answer length
+* retrieval latency
+* rerank latency
+* LLM generation latency
+* total latency
+* failure reason
+
+Example trace:
+
+```json
+{
+  "query_id": "q_f3b946be2365",
+  "question": "what is image segmentation",
+  "selected_source": "INTRODUCTION_TO_IMAGE_PROCESSING_29aug06.pdf",
+  "retrieval_mode": "hybrid",
+  "top_k": 1,
+  "answer_mode": "llm",
+  "citation_count": 1,
+  "latency_ms": {
+    "retrieval": 139.106,
+    "rerank": 2724.378,
+    "llm_generation": 9973.585,
+    "total": 12840.551
+  }
+}
+```
+
+---
+
+## Metrics Dashboard
+
+The frontend includes an observability dashboard showing:
+
+* total queries
+* latest latency
+* P50 latency
+* P95 latency
+* failure rate
+* citation coverage
+* LLM answer count
+* fallback answer count
+* retrieval average latency
+* rerank average latency
+* LLM average latency
+* recent query logs
+
+This makes it possible to diagnose performance and retrieval failures instead of guessing.
 
 ---
 
 ## Tech Stack
 
-| Layer          | Technology                  |
-| -------------- | --------------------------- |
-| Backend        | FastAPI                     |
-| PDF parsing    | PyMuPDF                     |
-| OCR fallback   | Tesseract OCR + pytesseract |
-| Embeddings     | SentenceTransformers        |
-| Vector DB      | ChromaDB                    |
-| Keyword Search | rank-bm25                   |
-| Reranking      | CrossEncoder                |
-| LLM            | Gemini API                  |
-| Evaluation     | Custom golden QA evaluation |
-| CI             | GitHub Actions              |
+| Layer          | Technology                             |
+| -------------- | -------------------------------------- |
+| Backend        | FastAPI                                |
+| Frontend       | React + Vite                           |
+| Vector Store   | ChromaDB                               |
+| Embeddings     | SentenceTransformers                   |
+| Keyword Search | BM25                                   |
+| Reranking      | CrossEncoder                           |
+| PDF Parsing    | PyMuPDF                                |
+| OCR Foundation | Tesseract / pytesseract-ready pipeline |
+| LLM            | Ollama local models                    |
+| Observability  | JSONL tracing + metrics API            |
+| UI             | Cyberpunk-style React dashboard        |
+
+---
+
+## Recommended Ollama Models
+
+For faster local demo:
+
+```bash
+ollama pull qwen2.5:1.5b
+```
+
+For better quality but slower response:
+
+```bash
+ollama pull llama3.2:3b
+```
+
+Recommended `.env` for faster demo:
+
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:1.5b
+OLLAMA_MAX_CONTEXT_CHARS=3000
+OLLAMA_TIMEOUT_SECONDS=180
+OLLAMA_NUM_PREDICT=160
+```
+
+---
+
+## Project Structure
+
+```text
+DocuGuardRAG/
+├── app/
+│   ├── api/
+│   │   ├── ingest.py
+│   │   ├── query.py
+│   │   └── metrics.py
+│   ├── core/
+│   │   ├── generator.py
+│   │   ├── pdf_parser.py
+│   │   ├── vector_store.py
+│   │   ├── hybrid_retriever.py
+│   │   ├── reranker.py
+│   │   ├── context_builder.py
+│   │   └── observability.py
+│   ├── schemas/
+│   │   └── models.py
+│   └── main.py
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── App.css
+│   │   └── api.js
+├── assets/
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   └── processed/observability/query_logs.jsonl
+├── eval/
+├── tests/
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## Setup Instructions
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/SagarInspires/DocuGuardRAG.git
+cd DocuGuardRAG
+```
+
+---
+
+### 2. Create virtual environment
+
+```bash
+python -m venv venv
+```
+
+Windows:
+
+```powershell
+.\venv\Scripts\activate
+```
+
+Linux / Mac:
+
+```bash
+source venv/bin/activate
+```
+
+---
+
+### 3. Install backend dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+If needed:
+
+```bash
+pip install fastapi uvicorn[standard] requests
+```
+
+---
+
+### 4. Install Ollama
+
+Install Ollama from:
+
+```text
+https://ollama.com
+```
+
+Pull a local model:
+
+```bash
+ollama pull qwen2.5:1.5b
+```
+
+Check whether Ollama is running:
+
+```bash
+curl http://localhost:11434/api/tags
+```
+
+---
+
+### 5. Create `.env`
+
+Create a `.env` file in the project root:
+
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:1.5b
+OLLAMA_MAX_CONTEXT_CHARS=3000
+OLLAMA_TIMEOUT_SECONDS=180
+OLLAMA_NUM_PREDICT=160
+```
+
+Do not commit `.env`.
+
+---
+
+### 6. Run backend
+
+```bash
+python -m uvicorn app.main:app --reload
+```
+
+Backend runs at:
+
+```text
+http://127.0.0.1:8000
+```
+
+Swagger docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+---
+
+### 7. Run frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend runs at:
+
+```text
+http://localhost:5173
+```
 
 ---
 
@@ -89,62 +424,19 @@ Answer + Citations + Retrieved Evidence
 GET /
 ```
 
-Returns backend status.
-
 ---
 
-### Upload Document
+### Documents
 
 ```http
 POST /documents/upload
-```
-
-Supported formats:
-
-```text
-.pdf
-.md
-.markdown
-.tex
-```
-
-Returns:
-
-```json
-{
-  "message": "File uploaded and indexed successfully",
-  "filename": "paper.pdf",
-  "document_units_extracted": 10,
-  "chunks_created": 39,
-  "chunks_indexed": 39,
-  "bm25_chunks_indexed": 39,
-  "acronyms_extracted": 26
-}
-```
-
----
-
-### List Documents
-
-```http
 GET /documents/
-```
-
-Returns uploaded documents.
-
----
-
-### Delete Document
-
-```http
 DELETE /documents/{filename}
 ```
 
-Deletes the document and its indexed vector chunks.
-
 ---
 
-### Query Documents
+### Query
 
 ```http
 POST /query/
@@ -154,276 +446,174 @@ Example request:
 
 ```json
 {
-  "question": "What is OCFAB in CFAT?",
-  "top_k": 3,
-  "source": "Ray_CFAT_Unleashing_Triangular_Windows_for_Image_Super-resolution_CVPR_2024_paper (1).pdf",
+  "question": "what is image segmentation",
+  "source": "INTRODUCTION_TO_IMAGE_PROCESSING_29aug06.pdf",
+  "top_k": 1,
   "retrieval_mode": "hybrid"
 }
 ```
 
-Example response includes:
+Example response:
 
 ```json
 {
-  "answer": "...",
+  "answer": "Image segmentation is the process of subdividing an image into its constituent parts or objects.",
+  "answer_mode": "llm",
   "citations": [
     {
-      "source": "paper.pdf",
-      "page": 2,
-      "chunk_id": "paper.pdf_p2_c1"
+      "source": "INTRODUCTION_TO_IMAGE_PROCESSING_29aug06.pdf",
+      "page": 5,
+      "chunk_id": "INTRODUCTION_TO_IMAGE_PROCESSING_29aug06.pdf_p5_c0"
     }
   ],
-  "retrieved_chunks": [
-    {
-      "chunk_id": "...",
-      "text": "...",
-      "source": "paper.pdf",
-      "page": 2,
-      "section": "",
-      "extraction_method": "pymupdf",
-      "distance": 0.72,
-      "hybrid_score": 0.75,
-      "rerank_score": 5.04
-    }
-  ]
+  "retrieved_chunks": []
 }
 ```
 
 ---
 
-## Retrieval Pipeline
+### Metrics
 
-DocuGuard RAG uses a hybrid retrieval pipeline:
-
-1. User question is expanded using document-specific acronyms.
-2. ChromaDB vector search retrieves semantic candidates.
-3. BM25 retrieves exact keyword/acronym matches.
-4. Reciprocal-rank-style fusion combines results.
-5. Cross-encoder reranker reorders chunks by query relevance.
-6. Top chunks are passed to the LLM.
-7. Citation validation checks answer grounding.
-
----
-
-## Evaluation
-
-The project includes a golden QA dataset:
-
-```text
-data/eval/golden_qa.csv
+```http
+GET /metrics/summary
+GET /metrics/recent
 ```
 
-Evaluation documents are stored separately in:
+Example `/metrics/summary` fields:
 
-```text
-data/eval_docs/
-```
-
-Run evaluation index build:
-
-```bash
-python eval/build_eval_index.py
-```
-
-Run retrieval evaluation:
-
-```bash
-python eval/run_retrieval_eval.py
-```
-
-Current quality gate:
-
-```text
-Source Accuracy@3 >= 0.90
-Location Recall@3 >= 0.80
-```
-
-Latest local result:
-
-```text
-Source Accuracy@3: 1.00
-Location Recall@3: 1.00
-Overall: PASSED
+```json
+{
+  "query_count": 2,
+  "answer_modes": {
+    "llm": 2
+  },
+  "failure_rate": 0.0,
+  "citation_coverage_rate": 1.0,
+  "latency_ms": {
+    "total": {
+      "avg": 40598.406,
+      "p50": 40598.406,
+      "p95": 65580.476
+    }
+  }
+}
 ```
 
 ---
-
-## GitHub Actions CI
-
-This repository includes CI for retrieval quality:
-
-```text
-.github/workflows/rag_eval.yml
-```
-
-On every push or pull request, GitHub Actions:
-
-1. Installs dependencies
-2. Builds the evaluation index
-3. Runs retrieval evaluation
-4. Fails if retrieval quality drops below threshold
-
----
-
-## Setup
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/SagarInspires/DocuGuardRAG.git
-cd DocuGuardRAG
-```
-
-### 2. Create virtual environment
-
-```bash
-python -m venv venv
-```
-
-Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-Linux/Mac:
-
-```bash
-source venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Create `.env`
-
-Create a `.env` file:
-
-```env
-GEMINI_API_KEY=your_api_key_here
-GEMINI_MODEL=gemini-2.0-flash-lite
-```
-
-### 5. Run backend
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Open Swagger UI:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
----
-
-## OCR Notes
-
-DocuGuard RAG includes OCR fallback for scanned and OneNote-exported PDFs.
-
-For OCR on Windows, install Tesseract OCR. The expected default path is:
-
-```text
-C:\Program Files\Tesseract-OCR\tesseract.exe
-```
-
-OCR is useful for scanned/OneNote PDFs, but handwritten notes may still be noisy. The system stores `extraction_method` metadata to show whether a chunk came from:
-
-```text
-pymupdf
-ocr
-pymupdf_ocr_failed
-```
-
----
-
-## What Makes This Project Different
-
-Most RAG demos only do:
-
-```text
-PDF → chunks → embeddings → answer
-```
-
-DocuGuard RAG adds production-style components:
-
-* hybrid retrieval
-* reranking
-* source filtering
-* citation validation
-* acronym-aware retrieval
-* OCR fallback
-* multi-format ingestion
-* golden QA evaluation
-* CI quality gate
-
----
-
-## Future Improvements
-
-* React frontend
-* Docker setup
-* user authentication
-* persistent BM25 cache
-* stronger OCR provider support
-* answer faithfulness evaluation
-* larger golden QA benchmark
-* streaming responses
-* deployment on cloud platform
-
----
-
 
 ## Frontend Dashboard
 
-DocuGuard RAG includes a React + Vite frontend dashboard for interacting with the backend.
+The React dashboard supports:
 
-### Frontend Features
+* document upload
+* parser option selection
+* document scope selection
+* top K control
+* retrieval mode control
+* answer display
+* answer mode badge
+* citation panel
+* retrieved chunk inspector
+* extraction method display
+* production metrics dashboard
+* recent query logs
+* animated cyberpunk-style UI
 
-- Upload PDF / Markdown / LaTeX documents
-- List indexed documents from ChromaDB
-- Select document scope
-- Ask questions using vector or hybrid retrieval
-- Display generated answer
-- Show citations
-- Inspect retrieved chunks
-- Show retrieval scores:
-  - vector distance
-  - hybrid score
-  - rerank score
-- Show extraction method:
-  - pymupdf
-  - ocr
-  - pymupdf_ocr_failed
-- Animated cyberpunk-style dashboard UI
-
-### Run Frontend
-
-Start backend first:
-
-uvicorn app.main:app --reload
+---
 
 ## Screenshots
 
-### Frontend Dashboard
+Add screenshots in the `assets/` folder.
 
+Recommended screenshots:
+
+```text
+assets/dashboard.png
+assets/query_result.png
+assets/observability_dashboard.png
+assets/swagger.png
+```
+
+Markdown references:
+
+```md
 ![Frontend Dashboard](assets/dashboard.png)
-
-### Query Result with Citations and Retrieved Evidence
 
 ![Query Result](assets/query_result.png)
 
-### GitHub Actions Retrieval Quality Gate
-
-![CI Green](assets/ci_green.png)
-
-### FastAPI Swagger Docs
+![Observability Dashboard](assets/observability_dashboard.png)
 
 ![Swagger Docs](assets/swagger.png)
+```
 
+---
 
-```bash
+## Evaluation and CI
+
+The project includes an evaluation foundation with:
+
+* golden QA dataset
+* retrieval evaluation
+* GitHub Actions workflow
+* source accuracy checks
+* location recall checks
+
+Evaluation files:
+
+```text
+eval/
+.github/workflows/
+```
+
+Planned next improvement:
+
+```text
+CI regression gating for faithfulness, citation coverage, and latency thresholds.
+```
+
+---
+
+## Current Limitations
+
+* Local LLM speed depends on system hardware and chosen Ollama model.
+* OCR layout preservation is lightweight and can be improved with OCR bounding boxes.
+* Inline citation validation is strict because citations are displayed separately in the UI.
+* Complex tables and handwritten notes may require stronger OCR/layout models.
+* Docker setup may require additional local configuration for Ollama.
+
+---
+
+## Future Work
+
+* Add faithfulness evaluation
+* Add retrieval precision metrics
+* Add CI regression gate for answer quality
+* Add optional Langfuse/LangSmith tracing
+* Add OCR bounding-box layout reconstruction
+* Add table-aware PDF parsing
+* Add streaming Ollama responses
+* Add authentication
+* Add downloadable trace reports
+* Add Docker-based one-command deployment
+
+---
+
+## Status
+
+Current stable version includes:
+
+* React + Vite frontend dashboard
+* FastAPI backend
+* multi-format document ingestion
+* parser selection controls
+* layout-aware PDF parsing
+* hybrid retrieval
+* reranking
+* local Ollama answer generation
+* citation inspection
+* retrieved chunk debugging
+* JSONL observability logs
+* backend metrics API
+* frontend observability dashboard
+
+DocuGuard RAG is ready for demo, screenshots, and further evaluation work.
