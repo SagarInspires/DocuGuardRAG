@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 import os
 import shutil
 
@@ -22,16 +22,115 @@ router = APIRouter()
 
 ALLOWED_EXTENSIONS = (".pdf", ".md", ".markdown", ".tex")
 
+VALID_DOCUMENT_TYPES = {
+    "auto",
+    "pdf",
+    "scanned_pdf",
+    "slides",
+    "report",
+    "markdown",
+    "latex",
+}
+
+VALID_EXTRACTION_MODES = {
+    "auto",
+    "text_only",
+    "ocr_only",
+    "hybrid",
+}
+
+VALID_LAYOUT_MODES = {
+    "auto",
+    "default",
+    "multi_column",
+    "slide_layout",
+    "report_layout",
+    "preserve_regions",
+}
+
+
+def validate_parser_options(
+    document_type: str,
+    extraction_mode: str,
+    layout_mode: str,
+) -> None:
+    if document_type not in VALID_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid document_type: {document_type}"
+        )
+
+    if extraction_mode not in VALID_EXTRACTION_MODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid extraction_mode: {extraction_mode}"
+        )
+
+    if layout_mode not in VALID_LAYOUT_MODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid layout_mode: {layout_mode}"
+        )
+
+
+def infer_document_type_from_extension(filename: str) -> str:
+    lower_filename = filename.lower()
+
+    if lower_filename.endswith(".pdf"):
+        return "pdf"
+
+    if lower_filename.endswith((".md", ".markdown")):
+        return "markdown"
+
+    if lower_filename.endswith(".tex"):
+        return "latex"
+
+    return "auto"
+
+
+def normalize_document_type(filename: str, document_type: str) -> str:
+    """
+    Manual user choice should override auto.
+    Auto falls back to file extension.
+    """
+
+    if document_type != "auto":
+        return document_type
+
+    return infer_document_type_from_extension(filename)
+
 
 @router.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...),
+    document_type: str = Form("auto"),
+    extraction_mode: str = Form("auto"),
+    layout_mode: str = Form("auto"),
+):
     filename = file.filename
+
+    if not filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing filename."
+        )
 
     if not filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(
             status_code=400,
             detail="Only PDF, Markdown, and LaTeX files are supported right now."
         )
+
+    validate_parser_options(
+        document_type=document_type,
+        extraction_mode=extraction_mode,
+        layout_mode=layout_mode,
+    )
+
+    resolved_document_type = normalize_document_type(
+        filename=filename,
+        document_type=document_type,
+    )
 
     os.makedirs(settings.raw_data_dir, exist_ok=True)
 
@@ -43,11 +142,31 @@ async def upload_document(file: UploadFile = File(...)):
     lower_filename = filename.lower()
 
     if lower_filename.endswith(".pdf"):
-        parsed_units = parse_pdf(file_path)
+        parsed_units = parse_pdf(
+            file_path,
+            document_type=resolved_document_type,
+            extraction_mode=extraction_mode,
+            layout_mode=layout_mode,
+        )
+
     elif lower_filename.endswith((".md", ".markdown")):
+        if resolved_document_type not in {"markdown", "auto"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected document type does not match Markdown file."
+            )
+
         parsed_units = parse_markdown(file_path)
+
     elif lower_filename.endswith(".tex"):
+        if resolved_document_type not in {"latex", "auto"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected document type does not match LaTeX file."
+            )
+
         parsed_units = parse_latex(file_path)
+
     else:
         raise HTTPException(
             status_code=400,
@@ -66,6 +185,9 @@ async def upload_document(file: UploadFile = File(...)):
         "message": "File uploaded and indexed successfully",
         "filename": filename,
         "path": file_path,
+        "document_type": resolved_document_type,
+        "extraction_mode": extraction_mode,
+        "layout_mode": layout_mode,
         "document_units_extracted": len(parsed_units),
         "chunks_created": len(chunks),
         "chunks_indexed": added_count,
@@ -95,6 +217,7 @@ def list_documents():
         "documents": files,
         "count": len(files)
     }
+
 
 @router.delete("/{filename}")
 def delete_document(filename: str):

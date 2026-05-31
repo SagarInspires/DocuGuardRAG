@@ -1,9 +1,28 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
-export async function uploadDocument(file) {
+async function readErrorMessage(response, fallbackMessage) {
+  try {
+    const errorData = await response.json();
+    return errorData.detail || fallbackMessage;
+  } catch {
+    try {
+      const errorText = await response.text();
+      return errorText || fallbackMessage;
+    } catch {
+      return fallbackMessage;
+    }
+  }
+}
+
+export async function uploadDocument(file, options = {}) {
   const formData = new FormData();
+
   formData.append("file", file);
+
+  formData.append("document_type", options.documentType || "auto");
+  formData.append("extraction_mode", options.extractionMode || "auto");
+  formData.append("layout_mode", options.layoutMode || "auto");
 
   const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
@@ -11,8 +30,11 @@ export async function uploadDocument(file) {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || "Document upload failed");
+    const message = await readErrorMessage(
+      response,
+      "Document upload failed"
+    );
+    throw new Error(message);
   }
 
   return response.json();
@@ -22,7 +44,11 @@ export async function listDocuments() {
   const response = await fetch(`${API_BASE_URL}/documents/`);
 
   if (!response.ok) {
-    throw new Error("Failed to fetch documents");
+    const message = await readErrorMessage(
+      response,
+      "Failed to fetch documents"
+    );
+    throw new Error(message);
   }
 
   return response.json();
@@ -37,8 +63,11 @@ export async function deleteDocument(filename) {
   );
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || "Failed to delete document");
+    const message = await readErrorMessage(
+      response,
+      "Failed to delete document"
+    );
+    throw new Error(message);
   }
 
   return response.json();
@@ -59,8 +88,8 @@ export async function askQuestion({ question, source, topK, retrievalMode }) {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || "Query failed");
+    const message = await readErrorMessage(response, "Query failed");
+    throw new Error(message);
   }
 
   return response.json();

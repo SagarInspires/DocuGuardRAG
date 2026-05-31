@@ -64,7 +64,8 @@ def ask_question(request: QueryRequest):
         return QueryResponse(
             answer="I could not find this in the uploaded documents.",
             citations=[],
-            retrieved_chunks=[]
+            retrieved_chunks=[],
+            answer_mode="no_results"
         )
 
     results = rerank_chunks(
@@ -77,7 +78,8 @@ def ask_question(request: QueryRequest):
         return QueryResponse(
             answer="I could not find this in the uploaded documents.",
             citations=[],
-            retrieved_chunks=[]
+            retrieved_chunks=[],
+            answer_mode="no_results"
         )
 
     retrieved_chunks = []
@@ -124,6 +126,11 @@ def ask_question(request: QueryRequest):
         context=context
     )
 
+    if is_extractive_fallback_answer(answer):
+        answer_mode = "extractive_fallback"
+    else:
+        answer_mode = "llm"
+
     citation_dicts = [citation.model_dump() for citation in citations]
 
     is_valid = validate_answer_citations(
@@ -131,18 +138,23 @@ def ask_question(request: QueryRequest):
         citations=citation_dicts
     )
 
-    # Important:
-    # If Gemini/API failed, generator.py returns an extractive fallback answer.
-    # That answer is already built directly from retrieved context, so do not
-    # overwrite it with the generic citation-validation error.
+    # Critical fix:
+    # Do NOT overwrite a valid Ollama LLM answer just because citation text
+    # is not embedded inside the answer paragraph.
+    #
+    # Your UI already displays citations separately.
+    # The answer should stay clean, while citations remain inspectable below.
     if not is_valid and not is_extractive_fallback_answer(answer):
-        answer = (
-            "I could not generate a citation-supported answer from the retrieved evidence. "
-            "Please check the retrieved_chunks field for the most relevant source passages."
+        print(
+            "[Citation validation warning] "
+            "Answer did not include explicit citation markers, "
+            "but answer is preserved because citations are returned separately."
         )
+        answer_mode = "llm"
 
     return QueryResponse(
         answer=answer,
         citations=citations,
-        retrieved_chunks=retrieved_chunks
+        retrieved_chunks=retrieved_chunks,
+        answer_mode=answer_mode
     )

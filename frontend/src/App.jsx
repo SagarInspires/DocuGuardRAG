@@ -12,6 +12,10 @@ function App() {
   const [selectedSource, setSelectedSource] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
 
+  const [documentType, setDocumentType] = useState("auto");
+  const [extractionMode, setExtractionMode] = useState("auto");
+  const [layoutMode, setLayoutMode] = useState("auto");
+
   const [question, setQuestion] = useState("");
   const [topK, setTopK] = useState(3);
   const [retrievalMode, setRetrievalMode] = useState("hybrid");
@@ -19,6 +23,7 @@ function App() {
   const [answer, setAnswer] = useState("");
   const [citations, setCitations] = useState([]);
   const [retrievedChunks, setRetrievedChunks] = useState([]);
+  const [answerMode, setAnswerMode] = useState("unknown");
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -51,7 +56,11 @@ function App() {
       setLoading(true);
       setMessage("Uploading and indexing document...");
 
-      const data = await uploadDocument(selectedFile);
+      const data = await uploadDocument(selectedFile, {
+        documentType,
+        extractionMode,
+        layoutMode,
+      });
 
       setMessage(
         `Uploaded successfully: ${data.filename} • Indexed ${data.chunks_indexed} chunks`
@@ -108,12 +117,53 @@ function App() {
       setAnswer(data.answer || "");
       setCitations(data.citations || []);
       setRetrievedChunks(data.retrieved_chunks || []);
+      setAnswerMode(data.answer_mode || "unknown");
       setMessage("Query completed successfully.");
     } catch (error) {
       setMessage(error.message || "Query failed.");
     } finally {
       setLoading(false);
     }
+  }
+
+  function clearOutput() {
+    setQuestion("");
+    setAnswer("");
+    setCitations([]);
+    setRetrievedChunks([]);
+    setAnswerMode("unknown");
+    setMessage("Workspace cleared.");
+  }
+
+  function getAnswerModeLabel(mode) {
+    if (mode === "extractive_fallback") return "Extractive Fallback";
+    if (mode === "llm") return "LLM Generated";
+    if (mode === "citation_validation_failed") return "Citation Validation Failed";
+    if (mode === "no_results") return "No Results";
+    return "Unknown Mode";
+  }
+
+  function getAnswerPanelKicker(mode) {
+    if (mode === "extractive_fallback") return "Extractive Fallback";
+    if (mode === "llm") return "LLM Output";
+    if (mode === "citation_validation_failed") return "Citation Validation Failed";
+    if (mode === "no_results") return "No Results";
+    return "Answer Output";
+  }
+
+  function getParserPlanLabel() {
+    const documentLabel =
+      documentType === "auto" ? "Auto document type" : documentType;
+
+    const extractionLabel =
+      extractionMode === "auto"
+        ? "page-level extraction"
+        : extractionMode;
+
+    const layoutLabel =
+      layoutMode === "auto" ? "layout-aware auto order" : layoutMode;
+
+    return `${documentLabel} • ${extractionLabel} • ${layoutLabel}`;
   }
 
   const statusTone = useMemo(() => {
@@ -230,16 +280,62 @@ function App() {
                 <p className="panel-kicker">Ingestion</p>
                 <h3>Upload Document</h3>
               </div>
-              <span className="panel-badge">PDF / MD / TEX</span>
+              <span className="panel-badge">PDF / MD / TEX / PPT</span>
             </div>
 
             <div className="stack">
               <label className="field-label">Choose file</label>
               <input
                 type="file"
-                accept=".pdf,.md,.markdown,.tex"
+                accept=".pdf,.md,.markdown,.tex,.ppt,.pptx"
                 onChange={(event) => setSelectedFile(event.target.files[0])}
               />
+
+              <label className="field-label">Document type</label>
+              <select
+                value={documentType}
+                onChange={(event) => setDocumentType(event.target.value)}
+              >
+                <option value="auto">Auto Detect</option>
+                <option value="pdf">PDF with text layer</option>
+                <option value="scanned_pdf">Scanned PDF / OCR-heavy</option>
+                <option value="slides">Slides / PPT-style PDF</option>
+                <option value="report">Report / multi-section document</option>
+                <option value="markdown">Markdown</option>
+                <option value="latex">LaTeX</option>
+              </select>
+
+              <label className="field-label">Extraction mode</label>
+              <select
+                value={extractionMode}
+                onChange={(event) => setExtractionMode(event.target.value)}
+              >
+                <option value="auto">Auto: decide page-by-page</option>
+                <option value="text_only">Text layer only</option>
+                <option value="ocr_only">OCR only</option>
+                <option value="hybrid">Text + OCR hybrid</option>
+              </select>
+
+              <label className="field-label">Layout mode</label>
+              <select
+                value={layoutMode}
+                onChange={(event) => setLayoutMode(event.target.value)}
+              >
+                <option value="auto">Auto layout detection</option>
+                <option value="default">Default reading order</option>
+                <option value="multi_column">
+                  Multi-column / left-right continuation
+                </option>
+                <option value="slide_layout">Slide layout</option>
+                <option value="report_layout">Report layout</option>
+                <option value="preserve_regions">
+                  Preserve regions and coordinates
+                </option>
+              </select>
+
+              <div className="parser-hint">
+                <strong>Parser plan:</strong> {getParserPlanLabel()}
+              </div>
 
               <button onClick={handleUpload} disabled={loading}>
                 Upload & Index
@@ -365,13 +461,7 @@ function App() {
                 </button>
                 <button
                   className="secondary-btn"
-                  onClick={() => {
-                    setQuestion("");
-                    setAnswer("");
-                    setCitations([]);
-                    setRetrievedChunks([]);
-                    setMessage("Workspace cleared.");
-                  }}
+                  onClick={clearOutput}
                   disabled={loading}
                 >
                   Clear Output
@@ -384,9 +474,25 @@ function App() {
             <div className="panel answer-panel">
               <div className="panel-head">
                 <div>
-                  <p className="panel-kicker">LLM Output</p>
+                  <p className="panel-kicker">
+                    {getAnswerPanelKicker(answerMode)}
+                  </p>
                   <h3>Answer</h3>
                 </div>
+
+                {answer && (
+                  <span
+                    className={`answer-mode-badge ${
+                      answerMode === "extractive_fallback"
+                        ? "fallback"
+                        : answerMode === "llm"
+                        ? "llm"
+                        : "neutral"
+                    }`}
+                  >
+                    {getAnswerModeLabel(answerMode)}
+                  </span>
+                )}
               </div>
 
               {answer ? (
