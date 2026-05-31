@@ -4,6 +4,8 @@ import {
   listDocuments,
   deleteDocument,
   askQuestion,
+  getMetricsSummary,
+  getRecentQueries,
 } from "./api";
 import "./App.css";
 
@@ -25,6 +27,10 @@ function App() {
   const [retrievedChunks, setRetrievedChunks] = useState([]);
   const [answerMode, setAnswerMode] = useState("unknown");
 
+  const [metricsSummary, setMetricsSummary] = useState(null);
+  const [recentQueries, setRecentQueries] = useState([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -42,8 +48,27 @@ function App() {
     }
   }
 
+  async function loadMetrics() {
+    try {
+      setMetricsLoading(true);
+
+      const [summaryData, recentData] = await Promise.all([
+        getMetricsSummary(),
+        getRecentQueries(5),
+      ]);
+
+      setMetricsSummary(summaryData);
+      setRecentQueries(recentData.queries || []);
+    } catch (error) {
+      console.error("Failed to load metrics:", error);
+    } finally {
+      setMetricsLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadDocuments();
+    loadMetrics();
   }, []);
 
   async function handleUpload() {
@@ -119,6 +144,8 @@ function App() {
       setRetrievedChunks(data.retrieved_chunks || []);
       setAnswerMode(data.answer_mode || "unknown");
       setMessage("Query completed successfully.");
+
+      await loadMetrics();
     } catch (error) {
       setMessage(error.message || "Query failed.");
     } finally {
@@ -164,6 +191,21 @@ function App() {
       layoutMode === "auto" ? "layout-aware auto order" : layoutMode;
 
     return `${documentLabel} • ${extractionLabel} • ${layoutLabel}`;
+  }
+
+  function formatMs(value) {
+    if (typeof value !== "number") return "0 ms";
+
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(2)}s`;
+    }
+
+    return `${value.toFixed(0)} ms`;
+  }
+
+  function formatRate(value) {
+    if (typeof value !== "number") return "0%";
+    return `${(value * 100).toFixed(0)}%`;
   }
 
   const statusTone = useMemo(() => {
@@ -271,6 +313,131 @@ function App() {
           <span>{message}</span>
         </div>
       )}
+
+      <section className="observability-panel panel">
+        <div className="panel-head">
+          <div>
+            <p className="panel-kicker">Observability</p>
+            <h3>Production Metrics</h3>
+          </div>
+
+          <button
+            className="secondary-btn mini-refresh-btn"
+            onClick={loadMetrics}
+            disabled={metricsLoading}
+          >
+            {metricsLoading ? "Refreshing..." : "Refresh Metrics"}
+          </button>
+        </div>
+
+        {metricsSummary?.query_count > 0 ? (
+          <>
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <span>Total Queries</span>
+                <strong>{metricsSummary.query_count}</strong>
+              </div>
+
+              <div className="metric-card">
+                <span>Latest Latency</span>
+                <strong>
+                  {formatMs(metricsSummary.latest_query?.total_latency_ms || 0)}
+                </strong>
+              </div>
+
+              <div className="metric-card">
+                <span>P50 Latency</span>
+                <strong>
+                  {formatMs(metricsSummary.latency_ms?.total?.p50 || 0)}
+                </strong>
+              </div>
+
+              <div className="metric-card">
+                <span>P95 Latency</span>
+                <strong>
+                  {formatMs(metricsSummary.latency_ms?.total?.p95 || 0)}
+                </strong>
+              </div>
+
+              <div className="metric-card">
+                <span>Failure Rate</span>
+                <strong>{formatRate(metricsSummary.failure_rate || 0)}</strong>
+              </div>
+
+              <div className="metric-card">
+                <span>Citation Coverage</span>
+                <strong>
+                  {formatRate(metricsSummary.citation_coverage_rate || 0)}
+                </strong>
+              </div>
+
+              <div className="metric-card">
+                <span>LLM Answers</span>
+                <strong>{metricsSummary.answer_modes?.llm || 0}</strong>
+              </div>
+
+              <div className="metric-card">
+                <span>Fallback Answers</span>
+                <strong>
+                  {metricsSummary.answer_modes?.extractive_fallback || 0}
+                </strong>
+              </div>
+            </div>
+
+            <div className="latency-breakdown">
+              <div>
+                <span>Retrieval avg</span>
+                <strong>
+                  {formatMs(metricsSummary.latency_ms?.retrieval?.avg || 0)}
+                </strong>
+              </div>
+
+              <div>
+                <span>Rerank avg</span>
+                <strong>
+                  {formatMs(metricsSummary.latency_ms?.rerank?.avg || 0)}
+                </strong>
+              </div>
+
+              <div>
+                <span>LLM avg</span>
+                <strong>
+                  {formatMs(metricsSummary.latency_ms?.llm_generation?.avg || 0)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="recent-query-list">
+              <h4>Recent Queries</h4>
+
+              {recentQueries.length > 0 ? (
+                recentQueries.map((query) => (
+                  <div className="recent-query-item" key={query.query_id}>
+                    <div>
+                      <p>{query.question}</p>
+                      <span>
+                        {query.answer_mode} •{" "}
+                        {formatMs(query.latency_ms?.total || 0)} •{" "}
+                        {query.selected_source || "All documents"}
+                      </span>
+                    </div>
+
+                    <span className="recent-query-badge">
+                      {query.citation_count || 0} citations
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="muted-text">No recent query logs found.</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="empty-state compact">
+            <p>No observability logs yet. Ask a question to generate metrics.</p>
+          </div>
+        )}
+      </section>
 
       <section className="workspace-grid">
         <aside className="control-column">

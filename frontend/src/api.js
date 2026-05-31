@@ -19,7 +19,6 @@ export async function uploadDocument(file, options = {}) {
   const formData = new FormData();
 
   formData.append("file", file);
-
   formData.append("document_type", options.documentType || "auto");
   formData.append("extraction_mode", options.extractionMode || "auto");
   formData.append("layout_mode", options.layoutMode || "auto");
@@ -89,6 +88,36 @@ export async function askQuestion({ question, source, topK, retrievalMode }) {
 
   if (!response.ok) {
     const message = await readErrorMessage(response, "Query failed");
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function getMetricsSummary() {
+  const response = await fetch(`${API_BASE_URL}/metrics/summary`);
+
+  if (!response.ok) {
+    const message = await readErrorMessage(
+      response,
+      "Failed to fetch metrics summary"
+    );
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+export async function getRecentQueries(limit = 10) {
+  const response = await fetch(
+    `${API_BASE_URL}/metrics/recent?limit=${encodeURIComponent(limit)}`
+  );
+
+  if (!response.ok) {
+    const message = await readErrorMessage(
+      response,
+      "Failed to fetch recent query logs"
+    );
     throw new Error(message);
   }
 

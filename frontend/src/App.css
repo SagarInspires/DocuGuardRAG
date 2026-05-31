@@ -85,7 +85,8 @@ textarea {
 .topbar,
 .hero-panel,
 .status-banner,
-.workspace-grid {
+.workspace-grid,
+.observability-panel {
   position: relative;
   z-index: 2;
 }
@@ -546,6 +547,140 @@ textarea {
   box-shadow: 0 0 18px rgba(34, 211, 238, 0.85);
 }
 
+/* OBSERVABILITY PANEL */
+
+.observability-panel {
+  margin: 0 0 22px;
+}
+
+.mini-refresh-btn {
+  min-width: 145px;
+  padding: 10px 13px;
+  font-size: 0.82rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  min-height: 108px;
+  padding: 15px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(4, 9, 27, 0.72), rgba(12, 21, 42, 0.56));
+  box-shadow: inset 0 0 28px rgba(34, 211, 238, 0.035);
+}
+
+.metric-card span {
+  display: block;
+  color: #91a7c3;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.metric-card strong {
+  display: block;
+  margin-top: 13px;
+  color: #ffffff;
+  font-size: clamp(1.35rem, 2.1vw, 2.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.latency-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.latency-breakdown div {
+  padding: 13px 14px;
+  border: 1px solid rgba(125, 211, 252, 0.13);
+  border-radius: 17px;
+  background: rgba(2, 6, 23, 0.46);
+}
+
+.latency-breakdown span {
+  display: block;
+  color: #8ea5c2;
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.latency-breakdown strong {
+  display: block;
+  margin-top: 7px;
+  color: #dff7ff;
+  font-size: 1.05rem;
+}
+
+.recent-query-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.recent-query-list h4 {
+  margin: 0 0 4px;
+  color: #f8fbff;
+  font-size: 0.98rem;
+  letter-spacing: -0.02em;
+}
+
+.recent-query-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 17px;
+  background: rgba(4, 8, 22, 0.54);
+}
+
+.recent-query-item p {
+  margin: 0;
+  color: #ecf5ff;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.recent-query-item span {
+  display: inline-block;
+  margin-top: 5px;
+  color: #91a7c3;
+  font-size: 0.8rem;
+}
+
+.recent-query-badge {
+  margin-top: 0 !important;
+  min-width: 92px;
+  text-align: center;
+  border: 1px solid rgba(34, 197, 94, 0.24);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(20, 83, 45, 0.28);
+  color: #bbf7d0 !important;
+  font-size: 0.78rem !important;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.muted-text {
+  margin: 0;
+  color: #8ea5c2;
+  line-height: 1.6;
+}
+
 /* WORKSPACE */
 
 .workspace-grid {
@@ -875,6 +1010,20 @@ textarea {
   white-space: pre-wrap;
 }
 
+.parser-hint {
+  padding: 12px 13px;
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.46);
+  color: #b9c8dc;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.parser-hint strong {
+  color: #e0f7ff;
+}
+
 /* SCROLLBARS */
 
 .doc-list::-webkit-scrollbar,
@@ -979,6 +1128,10 @@ textarea {
   .result-grid {
     grid-template-columns: 1fr;
   }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 920px) {
@@ -1021,6 +1174,25 @@ textarea {
   }
 }
 
+@media (max-width: 720px) {
+  .metrics-grid,
+  .latency-breakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-query-item {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-query-badge {
+    width: fit-content;
+  }
+
+  .mini-refresh-btn {
+    width: 100%;
+  }
+}
+
 @media (max-width: 560px) {
   .page-shell {
     width: calc(100vw - 16px);
@@ -1050,18 +1222,4 @@ textarea {
   .system-chip {
     display: none;
   }
-}
-
-.parser-hint {
-  padding: 12px 13px;
-  border: 1px solid rgba(125, 211, 252, 0.16);
-  border-radius: 14px;
-  background: rgba(2, 6, 23, 0.46);
-  color: #b9c8dc;
-  font-size: 0.82rem;
-  line-height: 1.55;
-}
-
-.parser-hint strong {
-  color: #e0f7ff;
 }
