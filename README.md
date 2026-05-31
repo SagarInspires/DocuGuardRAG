@@ -6,7 +6,24 @@ It supports hybrid retrieval, reranking, citation inspection, local LLM answer g
 
 This is not a basic PDF chatbot. It is built as an engineering-focused RAG system where every answer can be inspected through retrieved chunks, citations, answer mode, and query-level traces.
 
+# 📄 DocuGuard RAG
+
+> Transform any document into an interactive, evidence-grounded AI conversation using RAG, hybrid retrieval, reranking, citations, local Ollama LLM generation, and observability metrics.
+
+<p>
+  <img src="https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python" />
+  <img src="https://img.shields.io/badge/backend-FastAPI-009688?style=flat-square&logo=fastapi" />
+  <img src="https://img.shields.io/badge/frontend-React%20%2B%20Vite-61DAFB?style=flat-square&logo=react" />
+  <img src="https://img.shields.io/badge/vector%20db-ChromaDB-purple?style=flat-square" />
+  <img src="https://img.shields.io/badge/LLM-Ollama-black?style=flat-square" />
+  <img src="https://img.shields.io/badge/retrieval-Hybrid-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/observability-JSONL%20%2B%20Metrics-green?style=flat-square" />
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/status-active-success?style=flat-square" />
+</p>
+
 ---
+
 
 ## What DocuGuard RAG Solves
 
